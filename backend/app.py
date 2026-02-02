@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 #Flask cria o meu servidor, request é uma requisição, 
-# jsonify _> transforma o meu dicionario python em JSON, não salva resposta, apenas transforma em jason (um pacote)
 #SQALchemy conversa com o mueu banco de dados
 
 app = Flask(__name__)
@@ -16,13 +15,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 class Tarefa(db.Model): 
-    __tablename__ = "tarefas" #A minha classe acessa a tabela tarefas no banco
-    #Criação de colunas e tipos
+    __tablename__ = "tarefas"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     titulo = db.Column(db.String(200), nullable=False)
     descricao = db.Column(db.Text, nullable=True)
     concluida = db.Column(db.Boolean, default=False, nullable=False)
-    data_criacao = db.Column(db.DateTime, server_default=db.func.current_timestamp())#O banco define a data sozinho
+    data_criacao = db.Column(db.DateTime, server_default=db.func.current_timestamp())
 
     def dicio(self):
         return {
@@ -34,14 +32,13 @@ class Tarefa(db.Model):
         }
 
 
-# GET /api/tarefas - listar todas
-@app.route("/api/tarefas", methods=["GET"]) #“Quando alguém acessar /api/tarefas com GET(pegar)
+# GET - listar todas
+@app.route("/api/tarefas", methods=["GET"])
 def listar_tarefas():
-    tarefas = Tarefa.query.all() #busca todas as tarefas do banco
-    return jsonify([t.dicio() for t in tarefas]), 200 #transforma cada tarefa em dicionario e retorna uma lista de dicionarios
-#“Busque no banco todas as tarefas e guarde como objetos Python numa lista.”
+    tarefas = Tarefa.query.all() 
+    return jsonify([t.dicio() for t in tarefas]), 200 
 
-# POST /api/tarefas - criar nova tarefa
+# POST - criar nova tarefa
 @app.route("/api/tarefas", methods=["POST"])
 def criar_tarefa():
     dados = request.get_json(silent=True)
@@ -62,7 +59,7 @@ def criar_tarefa():
     return jsonify(nova.dicio()), 201
 
 
-# GET /api/tarefas/<id> - buscar por id
+# GET - buscar por id
 @app.route("/api/tarefas/<int:id>", methods=["GET"])
 def buscar_tarefa(id):
     tarefa = Tarefa.query.get(id)
@@ -72,7 +69,7 @@ def buscar_tarefa(id):
     return jsonify(tarefa.dicio()), 200
 
 
-# PUT /api/tarefas/<id> - atualizar
+# PUT - atualizar
 @app.route("/api/tarefas/<int:id>", methods=["PUT"])
 def atualizar_tarefa(id):
     tarefa = Tarefa.query.get(id)

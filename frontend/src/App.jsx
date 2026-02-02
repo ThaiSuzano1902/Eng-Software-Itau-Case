@@ -1,123 +1,254 @@
 import { useEffect, useState } from "react";
+import "./App.css";
 
 function App() {
   const [tarefas, setTarefas] = useState([]);
+
+  // Form
   const [titulo, setTitulo] = useState("");
-  const [descricao, setDescricao] = useState(""); 
+  const [descricao, setDescricao] = useState("");
   const [editandoTarefaId, setEditandoTarefaId] = useState(null);
 
-  // GET - buscar tarefas
-  useEffect(() => { //useEffect reage a mudanças ou eventos externos.
+  // Feedback
+  const [loading, setLoading] = useState(false);
+  const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
     buscarTarefas();
   }, []);
 
-  function buscarTarefas() {
-    fetch("http://127.0.0.1:5153/api/tarefas")
-      .then((res) => res.json())
-      .then((data) => setTarefas(data));
+  function limparMensagens() {
+    setMensagem("");
+    setErro("");
   }
 
-  // POST - criar tarefa
-  function criarTarefa(e) {
-    e.preventDefault(); 
-
-    fetch("http://127.0.0.1:5153/api/tarefas", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        titulo: titulo,
-        descricao: descricao,
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Erro ao criar tarefa");
-        }
-        return res.json();
-      })
-      .then(() => {
-        setTitulo("");
-        setDescricao("");
-        buscarTarefas(); // atualiza a lista
-      });
-  }
-  // PUT - atualizar tarefa
-  function toggleConcluida(tarefa) {
-  fetch(`http://127.0.0.1:5153/api/tarefas/${tarefa.id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      concluida: !tarefa.concluida,
-    }),
-  })
-    .then((res) => {
-      if (!res.ok) throw new Error("Erro ao atualizar");
-      return res.json();
-    })
-    .then(() => buscarTarefas());
-}
-  function editar_tarefa(tarefaId) {
-  if (editandoTarefaId !== tarefaId) {
-    setEditandoTarefaId(tarefaId);
-    method: "PUT",
-  } else {
+  function limparFormulario() {
+    setTitulo("");
+    setDescricao("");
     setEditandoTarefaId(null);
   }
 
-function deletarTarefa(tarefaId) {
-  fetch(`http://127.0.0.1:5153/api/tarefas/${tarefaId}`, {
-    method: "DELETE",
-  })
-    .then((res) => {
-      if (!res.ok) throw new Error("Erro ao deletar");
-    })
-    .then(() => buscarTarefas())
-    .catch((err) => console.error(err));
-}
+  function buscarTarefas() {
+    setLoading(true);
+    limparMensagens();
 
-    return (
-      <div>
-        <h1>Lista de Tarefas</h1>
+    fetch("http://127.0.0.1:5153/api/tarefas")
+      .then((res) => {
+        if (!res.ok) throw new Error("Erro ao buscar tarefas");
+        return res.json();
+      })
+      .then((data) => setTarefas(data))
+      .catch((err) => setErro(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  // POST - criar
+  function criarTarefa() {
+    limparMensagens();
+
+    return fetch("http://127.0.0.1:5153/api/tarefas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titulo, descricao }),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Erro ao criar tarefa (verifique o título)");
+      return res.json();
+    });
+  }
+
+  // PUT - editar titulo/descricao
+  function salvarEdicao() {
+    limparMensagens();
+
+    return fetch(`http://127.0.0.1:5153/api/tarefas/${editandoTarefaId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titulo, descricao }),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Erro ao editar tarefa");
+      return res.json();
+    });
+  }
+
+  // Submit do formulário (criar OU editar)
+  function enviarFormulario(e) {
+    e.preventDefault();
+
+    if (!titulo.trim()) {
+      setErro("Título é obrigatório.");
+      return;
+    }
+
+    setLoading(true);
+    limparMensagens();
+
+    let acao;
+
+    if (editandoTarefaId === null) {
+      acao = criarTarefa;
+    } else {
+      acao = salvarEdicao;
+    }
+
+    acao()
+      .then(() => {
+        setMensagem(
+          editandoTarefaId === null
+            ? "Tarefa criada com sucesso!"
+            : "Tarefa atualizada com sucesso!"
+        );
+        limparFormulario();
+        buscarTarefas();
+      })
+      .catch((err) => setErro(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  // Entrar no modo edição
+  function iniciarEdicao(tarefa) {
+    limparMensagens();
+    setEditandoTarefaId(tarefa.id);
+    setTitulo(tarefa.titulo ?? "");
+    setDescricao(tarefa.descricao ?? "");
+  }
+
+  // Cancelar edição / limpar
+  function cancelar() {
+    limparMensagens();
+    limparFormulario();
+  }
+
+  // PUT - marcar/desmarcar concluída
+  function toggleConcluida(tarefa) {
+    setLoading(true);
+    limparMensagens();
+
+    fetch(`http://127.0.0.1:5153/api/tarefas/${tarefa.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ concluida: !tarefa.concluida }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Erro ao atualizar status");
+        return res.json();
+      })
+      .then(() => {
+        setMensagem("Status atualizado!");
+        buscarTarefas();
+      })
+      .catch((err) => setErro(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  // DELETE
+  function deletarTarefa(tarefaId) {
+    const confirmar = window.confirm("Tem certeza que deseja excluir esta tarefa?");
+    if (!confirmar) return;
+
+    setLoading(true);
+    limparMensagens();
+
+    fetch(`http://127.0.0.1:5153/api/tarefas/${tarefaId}`, {
+      method: "DELETE",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Erro ao deletar tarefa");
+        return res.json().catch(() => ({})); // se não vier body, não quebra
+      })
+      .then(() => {
+        setMensagem("Tarefa deletada!");
+        buscarTarefas();
+      })
+      .catch((err) => setErro(err.message))
+      .finally(() => setLoading(false));
+  }
+
+return (
+  <div className="app">
+    <header className="hero">
+      <h1>Simulador de Viagem</h1>
+      <p>
+        Organize lugares que você quer visitar e marque os destinos que você já foi.
+        Tudo no clima do pôr do sol 🌅
+      </p>
+    </header>
+
+    <section className="card">
+      <div className="card__top">
+        {/* Feedback */}
+        <div className="feedback">
+          {loading && <div className="badge">Carregando…</div>}
+          {erro && <div className="badge badge--error">Erro: {erro}</div>}
+          {mensagem && <div className="badge badge--ok">{mensagem}</div>}
+        </div>
 
         {/* FORMULÁRIO */}
-        <form onSubmit={criarTarefa}>
-          <input
-            type="text"
-            placeholder="Título"
-            value={titulo}
-            onChange={(e) => setTitulo(e.target.value)}
-          />
+        <form onSubmit={enviarFormulario}>
+          <div className="formRow">
+            <input
+              className="input"
+              type="text"
+              placeholder="Lugar (título)"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+            />
+            <input
+              className="input"
+              type="text"
+              placeholder="Detalhes (descrição)"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+            />
+          </div>
 
-          <input
-            type="text"
-            placeholder="Descrição"
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-          />
+          <div className="actions">
+            <button className="btn btn--primary" type="submit" disabled={loading}>
+              {editandoTarefaId === null ? "Adicionar" : "Salvar alterações"}
+            </button>
 
-          <button type="submit">Adicionar</button>
+            <button className="btn btn--ghost" type="button" onClick={cancelar} disabled={loading}>
+              Cancelar
+            </button>
+          </div>
         </form>
+      </div>
 
-        <ul>
+      {/* LISTA */}
+      <div className="card__list">
+        <ul className="list">
           {tarefas.map((t) => (
-            <li key={t.id}>
+            <li key={t.id} className={`item ${t.concluida ? "isDone" : ""}`}>
               <input
+                className="checkbox"
                 type="checkbox"
-                checked={t.concluida}
+                checked={!!t.concluida}
                 onChange={() => toggleConcluida(t)}
+                disabled={loading}
               />
-              <strong style={{ marginLeft: 8 }}>{t.titulo}</strong> — {t.descricao}
-              <button onClick={() => deletarTarefa(t.id)}>Excluir</button>
+
+              <div className="item__text">
+                <div className="title">{t.titulo}</div>
+                <div className="desc">{t.descricao || <em>(sem descrição)</em>}</div>
+              </div>
+
+              <div className="item__buttons">
+                <button className="btn small" type="button" onClick={() => iniciarEdicao(t)} disabled={loading}>
+                  Editar
+                </button>
+                <button className="btn small" type="button" onClick={() => deletarTarefa(t.id)} disabled={loading}>
+                  Excluir
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       </div>
-    );
-  
+    </section>
+  </div>
+);
+
+
 }
 
 export default App;
